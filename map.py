@@ -359,13 +359,9 @@ def generate_map(
     total = len(locations)
     
        # Use tqdm progress bar for locations
-    with tqdm(locations, desc="Processing locations", unit="loc",maxinterval=1,mininterval=0.01) as progress:
+    with tqdm(locations, desc="Processing locations", unit="loc",maxinterval=1,mininterval=0.01,leave=True) as progress:
         for idx, (city, lat, lon, fclass, fcode) in enumerate(progress, start=1):
-            #print("AQI Legend:🔵 Good | 🟢 Moderate | 🟡 Unhealthy for Sensitive Groups | 🟠 Unhealthy | 🔴 Very Unhealthy | 🟣 Hazardous")
-
             percent = (idx / total) * 100
-            logging.info("[%d/%d] [%.2f%%] Processing: %s", idx, total, percent, city)
-
             data = fetch_aqi_for_location(lat, lon, token, cache)
             if not data:
                 continue
@@ -377,12 +373,15 @@ def generate_map(
             emoji = get_aqi_emoji(aqi)
             category = get_aqi_category(aqi)
             feature_desc = get_feature_code_desc(fclass, fcode, feature_codes)
+            print("\033c")
+            progress.update()
+            print("\nAQI Legend:🔵 Good | 🟢 Moderate | 🟡 Unhealthy for Sensitive Groups | 🟠 Unhealthy | 🔴 Very Unhealthy | 🟣 Hazardous")
+            #logging.info("[%d/%d] [%.2f%%] Processing: %s", idx, total, percent, city)
             logging.info(
-                "  %s %s | AQI=%d | Category=%s | Dominant=%s | Feature=%s",
-                emoji, city, aqi, category, dominentpol.upper(), feature_desc
+                "[%d/%d] [%.2f%%] %s | AQI=%d %s Category=%s | Dominant=%s | Feature=%s",
+                idx, total, percent, city, aqi, emoji, category, dominentpol.upper(), feature_desc
             )
 
-            print("\033c")
 
             # Collect data for heatmap (lat, lon, weight)
             heat_data.append([lat, lon, aqi])
