@@ -14,27 +14,29 @@ The application will not work without this file.
 
 ## How It Works
 
-- The script reads Slovak city data from `SK.txt` (from GeoNames).
-- It filters cities with a population above 1000 and excludes administrative regions (e.g., names containing "okres").
-- For each city, it fetches real-time AQI (Air Quality Index) data from the [World Air Quality Index API](https://aqicn.org/api/).
+- The script reads Slovak city data from `sk.txt` (from GeoNames).
+- It filters cities with a population above a threshold (default: 0).
+- For each city, it fetches real-time AQI (Air Quality Index) data from the [World Air Quality Index API](https://aqicn.org/api/), with caching to avoid redundant requests.
 - The map displays each city as a colored marker (color based on AQI) with a popup showing AQI details and pollutants.
 - A heatmap overlay visualizes AQI intensity across the country.
-- The final map is saved as `slovakia_aqicn_heatmap_population.html`.
+- The map includes a WAQI tile overlay, marker clustering, fullscreen mode, and location control.
+- The final map is saved as `output/AQI_map_Slovakia.html`.
 
 ## Setup
 
 1. **Clone this repository.**
 2. **Download and place `SK.txt` as described above.**
-3. **Install dependencies:**
+3. **(Optional) Download `featureCodes_en.csv` from [GeoNames](https://download.geonames.org/export/dump/featureCodes_en.txt) and place it in the root directory for feature code descriptions.**
+4. **Create a file named `api_key.secret` in the root directory and paste your AQI API token inside. Get your token here: [https://aqicn.org/data-platform/token/](https://aqicn.org/data-platform/token/)**
+5. **Install dependencies:**
 ```
 pip install pandas folium requests
 ```
-4. **Set your AQI API token. Get your's here: [https://aqicn.org/data-platform/token/](https://aqicn.org/data-platform/token/)**
-5. **Run the script: (Takes a while, depending on your population treshold, so be patient!)**
+6. **Run the script:**
 ```
 python map.py
- ```
-5. **Open slovakia_aqicn_heatmap_population.html in your browser to view the map.**
+```
+7. **Open `output/AQI_map_Slovakia.html` in your browser to view the map.**
 
 ## Screenshots
 ![Main Map View](screenshots/main-map.png)
