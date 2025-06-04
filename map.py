@@ -8,7 +8,7 @@ Results are cached locally; entries older than 4 hours are automatically refresh
 “old-format” cache entries (without timestamps) are migrated on first access.
 
 Usage:
-    python aqi_map.py [--token-file TOKEN_FILE]
+    python map.py     [--token-file TOKEN_FILE]
                       [--feature-codes FEATURE_CODES_FILE]
                       [--input-file INPUT_FILE]
                       [--cache-file CACHE_FILE]
@@ -266,8 +266,9 @@ def fetch_aqi_for_location(lat: float, lon: float, token: str, cache: dict, dela
         # New-format entry exists; check age
         entry_ts = entry.get("timestamp", 0)
         age = now - entry_ts
+        till_refresh = CACHE_TTL_SECONDS - age
         if age < CACHE_TTL_SECONDS:
-            logging.info("  ✅ Using cached AQI data for %s (age: %.1f min).", key, age / 60.0)
+            logging.info("  ✅ Using cached AQI data for %s (age: %.1f min. Refresh in: %.1f min.).", key, age / 60.0, till_refresh / 60)
             return entry["data"]
         else:
             logging.info("  ℹ️ Cache expired for %s (age: %.1f min). Refreshing...", key, age / 60.0)
@@ -358,6 +359,7 @@ def generate_map(
     total = len(locations)
     for idx, (city, lat, lon, fclass, fcode) in enumerate(locations, start=1):
         percent = (idx / total) * 100
+        
         logging.info("[%d/%d] [%.2f%%] Processing: %s", idx, total, percent, city)
 
         data = fetch_aqi_for_location(lat, lon, token, cache)
@@ -371,7 +373,7 @@ def generate_map(
         emoji = get_aqi_emoji(aqi)
         category = get_aqi_category(aqi)
         feature_desc = get_feature_code_desc(fclass, fcode, feature_codes)
-
+        print("\033c")  # clear terminal
         logging.info(
             "  %s %s | AQI=%d | Category=%s | Dominant=%s | Feature=%s",
             emoji, city, aqi, category, dominentpol.upper(), feature_desc
@@ -486,7 +488,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--population-threshold",
         type=int,
-        default=1000,
+        default=10000,
         help="Minimum population of locations to include (default: 1000)."
     )
     return parser.parse_args()
