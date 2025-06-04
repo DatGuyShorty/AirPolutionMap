@@ -232,7 +232,7 @@ def get_feature_code_desc(feature_class: str, feature_code: str, feature_codes: 
     return feature_codes.get(fkey, "⚠️ Unknown feature code")
 
 
-def fetch_aqi_for_location(lat: float, lon: float, token: str, cache: dict, delay: float = 0.25) -> dict:
+def fetch_aqi_for_location(lat: float, lon: float, token: str, cache: dict, delay: float = 0.1) -> dict:
     """
     Fetch AQI data for a given latitude/longitude from the WAQI API, using and updating the cache.
     - If a new-format cache entry exists and is younger than CACHE_TTL_SECONDS, return it.
@@ -358,7 +358,7 @@ def generate_map(
     total = len(locations)
     for idx, (city, lat, lon, fclass, fcode) in enumerate(locations, start=1):
         percent = (idx / total) * 100
-        logging.info("[%d/%d] [%.1f%%] Processing: %s", idx, total, percent, city)
+        logging.info("[%d/%d] [%.2f%%] Processing: %s", idx, total, percent, city)
 
         data = fetch_aqi_for_location(lat, lon, token, cache)
         if not data:
