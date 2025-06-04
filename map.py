@@ -13,7 +13,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
-        logging.FileHandler("aqi_map.log", encoding="utf-8"),
+        logging.FileHandler("aqi_map.log", encoding="utf-8", mode="w"),
         logging.StreamHandler()
     ]
 )
