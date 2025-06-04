@@ -140,8 +140,8 @@ try:
 
     # Save final map
     file_name = "AQI_map_Slovakia.html"
-    m.save(r"output\{file_name}")
-    print("Map saved to output folder. As {file_name}")
+    m.save(f"output\{file_name}")
+    print(f"Map saved to output folder. As {file_name}")
 
 except KeyboardInterrupt:
     print("\n⏹️ Interrupted by user.")
