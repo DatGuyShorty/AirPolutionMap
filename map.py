@@ -207,7 +207,7 @@ try:
         dom = data.get("dominentpol", "N/A")
         iaqi = data.get("iaqi", {})
 
-        logging.info(f"  {get_aqi_emoji(aqi)} {city} AQI = {aqi} (dominant: {dom}) Status: {get_aqi_category(aqi)} feature class: {get_feature_code_desc(fclass, fcode)}")
+        logging.info(f"  {get_aqi_emoji(aqi)} {city}, AQI = {aqi}, Dominant polutant: {dom}, Status: {get_aqi_category(aqi)}, Feature class: {get_feature_code_desc(fclass, fcode)}")
         heat_data.append([lat, lon, aqi])
 
         popup = f"<b>{city}</b><br>Status: <b>{get_aqi_category(aqi)}</b><br>AQI: <b>{aqi}</b><br>Dominant: <b>{dom.upper()}</b><br>"
