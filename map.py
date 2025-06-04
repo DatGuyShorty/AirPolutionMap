@@ -4,7 +4,8 @@ AQI Map Generator for Slovakia
 
 This script reads geographic data for Slovakian cities, fetches Air Quality Index (AQI) data
 from the WAQI API, and generates an interactive Folium map with markers and a heatmap overlay.
-Results are cached locally to minimize API requests.
+Results are cached locally; entries older than 4 hours are automatically refreshed. Existing
+“old-format” cache entries (without timestamps) are migrated on first access.
 
 Usage:
     python aqi_map.py [--token-file TOKEN_FILE]
@@ -34,6 +35,9 @@ import requests
 import pandas as pd
 import folium
 from folium.plugins import HeatMap, MarkerCluster, Fullscreen, LocateControl
+
+# Cache Time-to-Live (in seconds): 4 hours
+CACHE_TTL_SECONDS = 4 * 3600
 
 
 def setup_logging(log_file: str = "app_log.log") -> None:
@@ -103,9 +107,21 @@ def load_feature_codes(feature_codes_path: str) -> dict:
 
     return feature_codes
 
+
 def load_cache(cache_path: str) -> dict:
     """
-    Load the cached AQI responses from a JSON file. If the file doesn't exist, create an empty cache.
+    Load the cached AQI responses from a JSON file. If the file doesn't exist or is invalid,
+    return an empty cache.
+
+    Old-format entries (where the value is just raw data) will be migrated on first usage.
+    New-format entries are stored as:
+        {
+            "<lat>,<lon>": {
+                "timestamp": <epoch_seconds>,
+                "data": { ... WAQI data ... }
+            },
+            ...
+        }
 
     :param cache_path: Path to the cache file.
     :return: Dictionary representing the cache.
@@ -116,8 +132,8 @@ def load_cache(cache_path: str) -> dict:
                 cache = json.load(f)
             logging.info("✅ Loaded AQI cache from %s.", cache_path)
             return cache
-        except json.JSONDecodeError:
-            logging.warning("⚠️ Cache file '%s' is corrupt. Starting with an empty cache.", cache_path)
+        except (json.JSONDecodeError, PermissionError) as e:
+            logging.warning("⚠️ Cache file '%s' is corrupt or unreadable. Starting with an empty cache. (%s)", cache_path, e)
     else:
         logging.warning("⚠️ Cache file '%s' not found. Creating a new cache.", cache_path)
 
@@ -126,12 +142,16 @@ def load_cache(cache_path: str) -> dict:
 
 def save_cache(cache: dict, cache_path: str) -> None:
     """
-    Save the AQI cache to a JSON file.
+    Save the AQI cache to a JSON file. Overwrites the entire file.
 
     :param cache: Dictionary to save.
     :param cache_path: Path to the cache file.
     """
     try:
+        out_dir = os.path.dirname(cache_path)
+        if out_dir and not os.path.exists(out_dir):
+            os.makedirs(out_dir, exist_ok=True)
+
         with open(cache_path, "w", encoding="utf-8") as f:
             json.dump(cache, f, indent=2)
         logging.info("✅ AQI cache saved to %s.", cache_path)
@@ -214,32 +234,58 @@ def get_feature_code_desc(feature_class: str, feature_code: str, feature_codes: 
 
 def fetch_aqi_for_location(lat: float, lon: float, token: str, cache: dict, delay: float = 1.0) -> dict:
     """
-    Fetch AQI data for a given latitude/longitude from the WAQI API, using and updating the cache if possible.
+    Fetch AQI data for a given latitude/longitude from the WAQI API, using and updating the cache.
+    - If a new-format cache entry exists and is younger than CACHE_TTL_SECONDS, return it.
+    - If it exists but is older, or if no entry exists, fetch fresh data and overwrite.
+    - If an old-format entry is found (i.e., raw data without 'timestamp'), migrate it to new format,
+      using 'now' as the timestamp, and return its data without re-fetching.
 
     :param lat: Latitude.
     :param lon: Longitude.
     :param token: API token.
     :param cache: Cache dictionary to read/write.
-    :param delay: Number of seconds to pause after a successful API call.
-    :return: Dictionary of API response data, or an empty dict if unavailable.
+                  Keys: "lat,lon" strings; values either:
+                    - new-format: {"timestamp": <epoch>, "data": {...}}
+                    - old-format: {... raw WAQI data ...}
+    :param delay: Seconds to pause after a successful API call.
+    :return: Dictionary of API response data, or {} if unavailable.
     """
     key = f"{lat},{lon}"
-    if key in cache:
-        logging.info("  ✅ Using cached AQI data for %s.", key)
-        return cache[key]
+    now = time.time()
 
+    if key in cache:
+        entry = cache[key]
+
+        # Detect old-format entry (no 'timestamp' or 'data' keys)
+        if not (isinstance(entry, dict) and "timestamp" in entry and "data" in entry):
+            old_data = entry
+            cache[key] = {"timestamp": now, "data": old_data}
+            logging.info("  ℹ️ Migrated old cache format for %s.", key)
+            return old_data
+
+        # New-format entry exists; check age
+        entry_ts = entry.get("timestamp", 0)
+        age = now - entry_ts
+        if age < CACHE_TTL_SECONDS:
+            logging.info("  ✅ Using cached AQI data for %s (age: %.1f min).", key, age / 60.0)
+            return entry["data"]
+        else:
+            logging.info("  ℹ️ Cache expired for %s (age: %.1f min). Refreshing...", key, age / 60.0)
+
+    # Either no entry or expired; fetch from API
     url = f"https://api.waqi.info/feed/geo:{lat};{lon}/?token={token}"
     try:
         logging.info("  ⬇️ Fetching AQI data from API for %s...", key)
         resp = requests.get(url, timeout=10)
         resp.raise_for_status()
         result = resp.json()
-        if result.get("status") == "ok":
+        if result.get("status") == "ok" and "data" in result:
             data = result["data"]
-            cache[key] = data
+            cache[key] = {"timestamp": now, "data": data}
             time.sleep(delay)
             return data
-        logging.warning("  ⚠️ API response not OK for %s: %s", key, result.get("data"))
+        else:
+            logging.warning("  ⚠️ API response not OK for %s: %s", key, result.get("data", result))
     except requests.RequestException as e:
         logging.error("  ❌ Request failed for %s: %s", key, e)
     except ValueError as e:
@@ -457,40 +503,34 @@ def main():
     feature_codes = load_feature_codes(args.feature_codes)
     aqi_cache = load_cache(args.cache_file)
 
-    # Read and filter locations
-    locations = read_locations(args.input_file, population_threshold=args.population_threshold)
-    if not locations:
-        logging.error("❌ No locations to process. Exiting.")
-        return
+    try:
+        # Read and filter locations
+        locations = read_locations(args.input_file, population_threshold=args.population_threshold)
+        if not locations:
+            logging.error("❌ No locations to process. Exiting.")
+            return
 
-    # Build and save the map
-    output_path = os.path.join(args.output_dir, args.output_file)
-    center_coords = (48.7, 19.5)  # Center over Slovakia
-    generate_map(
-        center=center_coords,
-        zoom_start=8,
-        locations=locations,
-        token=token,
-        feature_codes=feature_codes,
-        cache=aqi_cache,
-        output_path=output_path
-    )
+        # Build and save the map
+        output_path = os.path.join(args.output_dir, args.output_file)
+        center_coords = (48.7, 19.5)  # Center over Slovakia
+        generate_map(
+            center=center_coords,
+            zoom_start=8,
+            locations=locations,
+            token=token,
+            feature_codes=feature_codes,
+            cache=aqi_cache,
+            output_path=output_path
+        )
 
-    # Save cache on exit
-    save_cache(aqi_cache, args.cache_file)
-    logging.info("🏁 AQI map generation complete.")
+    except KeyboardInterrupt:
+        logging.info("⏹️ Interrupted by user during processing.")
+
+    finally:
+        # Save cache on exit (even if interrupted)
+        save_cache(aqi_cache, args.cache_file)
+        logging.info("ℹ️ AQI map generation terminated; cache saved.")
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        logging.info("⏹️ Interrupted by user. Saving cache and exiting...")
-        # Attempt to save any cached data before exiting
-        # Note: aqi_cache may not exist here if interruption was too early
-        try:
-            args = parse_args()
-            save_cache(load_cache(args.cache_file), args.cache_file)
-        except Exception:
-            pass
-        exit(0)
+    main()
