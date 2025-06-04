@@ -268,7 +268,7 @@ def fetch_aqi_for_location(lat: float, lon: float, token: str, cache: dict, dela
         age = now - entry_ts
         till_refresh = CACHE_TTL_SECONDS - age
         if age < CACHE_TTL_SECONDS:
-            logging.info("  ✅ Using cached AQI data for %s (age: %.1f min. Refresh in: %.1f min.).", key, age / 60.0, till_refresh / 60)
+            logging.info("  ✅ Using cached AQI data for %s (age: %.1f min. refresh in: %.1f min.).", key, age / 60.0, till_refresh / 60)
             return entry["data"]
         else:
             logging.info("  ℹ️ Cache expired for %s (age: %.1f min). Refreshing...", key, age / 60.0)
@@ -488,7 +488,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--population-threshold",
         type=int,
-        default=10000,
+        default=1000,
         help="Minimum population of locations to include (default: 1000)."
     )
     return parser.parse_args()
