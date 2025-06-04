@@ -167,9 +167,9 @@ def get_aqi_color(aqi: int) -> str:
     :return: Color string.
     """
     if aqi <= 50:
-        return "blue"
-    if aqi <= 100:
         return "green"
+    if aqi <= 100:
+        return "blue"
     if aqi <= 150:
         return "yellow"
     if aqi <= 200:
@@ -207,9 +207,9 @@ def get_aqi_emoji(aqi: int) -> str:
     :return: Emoji string.
     """
     if aqi <= 50:
-        return "🔵"
-    if aqi <= 100:
         return "🟢"
+    if aqi <= 100:
+        return "🔵"
     if aqi <= 150:
         return "🟡"
     if aqi <= 200:
@@ -375,7 +375,7 @@ def generate_map(
             feature_desc = get_feature_code_desc(fclass, fcode, feature_codes)
             print("\033c")
             progress.update()
-            print("\nAQI Legend:🔵 Good | 🟢 Moderate | 🟡 Unhealthy for Sensitive Groups | 🟠 Unhealthy | 🔴 Very Unhealthy | 🟣 Hazardous")
+            print("\nAQI Legend:🟢 Good | 🔵 Moderate | 🟡 Unhealthy for Sensitive Groups | 🟠 Unhealthy | 🔴 Very Unhealthy | 🟣 Hazardous")
             #logging.info("[%d/%d] [%.2f%%] Processing: %s", idx, total, percent, city)
             logging.info(
                 "[%d/%d] [%.2f%%] %s | AQI=%d %s Category=%s | Dominant=%s | Feature=%s",
