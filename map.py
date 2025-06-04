@@ -35,7 +35,7 @@ import requests
 import pandas as pd
 import folium
 from folium.plugins import HeatMap, MarkerCluster, Fullscreen, LocateControl
-
+from tqdm import tqdm
 # Cache Time-to-Live (in seconds): 4 hours
 CACHE_TTL_SECONDS = 4 * 3600
 
@@ -357,47 +357,51 @@ def generate_map(
     heat_data = []
 
     total = len(locations)
-    for idx, (city, lat, lon, fclass, fcode) in enumerate(locations, start=1):
-        percent = (idx / total) * 100
-        
-        logging.info("[%d/%d] [%.2f%%] Processing: %s", idx, total, percent, city)
+    
+       # Use tqdm progress bar for locations
+    with tqdm(locations, desc="Processing locations", unit="loc",maxinterval=1,mininterval=0.01) as progress:
+        for idx, (city, lat, lon, fclass, fcode) in enumerate(progress, start=1):
+            #print("AQI Legend:🔵 Good | 🟢 Moderate | 🟡 Unhealthy for Sensitive Groups | 🟠 Unhealthy | 🔴 Very Unhealthy | 🟣 Hazardous")
 
-        data = fetch_aqi_for_location(lat, lon, token, cache)
-        if not data:
-            continue
+            percent = (idx / total) * 100
+            logging.info("[%d/%d] [%.2f%%] Processing: %s", idx, total, percent, city)
 
-        aqi = data.get("aqi", 0)
-        dominentpol = data.get("dominentpol", "N/A")
-        iaqi = data.get("iaqi", {})
+            data = fetch_aqi_for_location(lat, lon, token, cache)
+            if not data:
+                continue
 
-        emoji = get_aqi_emoji(aqi)
-        category = get_aqi_category(aqi)
-        feature_desc = get_feature_code_desc(fclass, fcode, feature_codes)
-        print("\033c")  # clear terminal
-        print("AQI Legend:🔵 Good | 🟢 Moderate | 🟡 Unhealthy for Sensitive Groups | 🟠 Unhealthy | 🔴 Very Unhealthy | 🟣 Hazardous")
-        logging.info(
-            "  %s %s | AQI=%d | Category=%s | Dominant=%s | Feature=%s",
-            emoji, city, aqi, category, dominentpol.upper(), feature_desc
-        )
+            aqi = data.get("aqi", 0)
+            dominentpol = data.get("dominentpol", "N/A")
+            iaqi = data.get("iaqi", {})
 
-        # Collect data for heatmap (lat, lon, weight)
-        heat_data.append([lat, lon, aqi])
+            emoji = get_aqi_emoji(aqi)
+            category = get_aqi_category(aqi)
+            feature_desc = get_feature_code_desc(fclass, fcode, feature_codes)
+            logging.info(
+                "  %s %s | AQI=%d | Category=%s | Dominant=%s | Feature=%s",
+                emoji, city, aqi, category, dominentpol.upper(), feature_desc
+            )
 
-        # Build popup HTML
-        popup_html = (
-            f"<b>{city}</b><br>"
-            f"Status: <b>{category}</b><br>"
-            f"AQI: <b>{aqi}</b><br>"
-            f"Dominant Pollutant: <b>{dominentpol.upper()}</b><br>"
-        )
-        for pollutant, val in iaqi.items():
-            popup_html += f"{pollutant.upper()}: {val.get('v')}<br>"
+            print("\033c")
 
-        folium.Marker(
-            location=(lat, lon),
-            popup=popup_html,
-            icon=folium.Icon(color=get_aqi_color(aqi))
-        ).add_to(marker_cluster)
+            # Collect data for heatmap (lat, lon, weight)
+            heat_data.append([lat, lon, aqi])
+
+            # Build popup HTML
+            popup_html = (
+                f"<b>{city}</b><br>"
+                f"Status: <b>{category}</b><br>"
+                f"AQI: <b>{aqi}</b><br>"
+                f"Dominant Pollutant: <b>{dominentpol.upper()}</b><br>"
+            )
+            for pollutant, val in iaqi.items():
+                popup_html += f"{pollutant.upper()}: {val.get('v')}<br>"
+
+            folium.Marker(
+                location=(lat, lon),
+                popup=popup_html,
+                icon=folium.Icon(color=get_aqi_color(aqi))
+            ).add_to(marker_cluster)
 
     # Add heatmap layer if any data points exist
     if heat_data:
@@ -489,7 +493,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--population-threshold",
         type=int,
-        default=1000,
+        default=100,
         help="Minimum population of locations to include (default: 1000)."
     )
     return parser.parse_args()
