@@ -27,15 +27,16 @@ The application will not work without this file.
 1. **Clone this repository.**
 2. **Download and place `SK.txt` as described above.**
 3. **(Optional) Download `featureCodes_en.csv` from [GeoNames](https://download.geonames.org/export/dump/featureCodes_en.txt) and place it in the root directory for feature code descriptions.**
-4. **Create a file named `api_key.secret` in the root directory and paste your AQI API token inside. Get your token here: [https://aqicn.org/data-platform/token/](https://aqicn.org/data-platform/token/)**
-5. **Install dependencies:**
+4. **Install dependencies:**
 ```
 pip install pandas folium requests
 ```
-6. **Run the script:**
+5. **Run the script:**
 ```
 python map.py
 ```
+6. **Get your token here: [https://aqicn.org/data-platform/token/](https://aqicn.org/data-platform/token/) and paste your AQI API token inside terminal after being prompted.**
+
 7. **Open `output/AQI_map_Slovakia.html` in your browser to view the map.**
 
 ## Screenshots
