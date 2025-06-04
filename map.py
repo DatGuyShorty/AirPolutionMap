@@ -374,6 +374,7 @@ def generate_map(
         category = get_aqi_category(aqi)
         feature_desc = get_feature_code_desc(fclass, fcode, feature_codes)
         print("\033c")  # clear terminal
+        print("AQI Legend:🔵 Good | 🟢 Moderate | 🟡 Unhealthy for Sensitive Groups | 🟠 Unhealthy | 🔴 Very Unhealthy | 🟣 Hazardous")
         logging.info(
             "  %s %s | AQI=%d | Category=%s | Dominant=%s | Feature=%s",
             emoji, city, aqi, category, dominentpol.upper(), feature_desc
@@ -499,7 +500,7 @@ def main():
     setup_logging()
 
     logging.info("🚀 Starting AQI map generation.")
-
+    logging.info("AQI Legend:🔵 Good | 🟢 Moderate | 🟡 Unhealthy for Sensitive Groups | 🟠 Unhealthy | 🔴 Very Unhealthy | 🟣 Hazardous")
     # Load API token, feature codes, and cache
     token = load_token(args.token_file)
     feature_codes = load_feature_codes(args.feature_codes)
