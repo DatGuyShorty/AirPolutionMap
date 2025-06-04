@@ -6,28 +6,48 @@ import time
 import json
 import os
 import csv
+import logging
+
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler("aqi_map.log", encoding="utf-8"),
+        logging.StreamHandler()
+    ]
+)
 
 token_secret = "api_key.secret"
 feature_codes_file = "featureCodes_en.csv"
 output_file_name = "AQI_map_Slovakia.html"
+
 
 def load_token(token_secret):
     if os.path.exists(token_secret):
         with open(token_secret, "r") as f:
             TOKEN = f.read().strip()
             if TOKEN != "":
-                print("✅ Token loaded from secret file.")
-                time.sleep(3)
+                logging.info("✅ Token loaded from secret file.")
+                time.sleep(1)
             else:
-                print("🔐 API token not found.")
+                logging.warning("🔐 API token not found.")
                 TOKEN = input("Please paste your AQI API token: ").strip()
                 with open(token_secret, "w") as f:
                     f.write(TOKEN)
-                print("✅ Token saved to secret file.")
-                time.sleep(3)
+                logging.info("✅ Token saved to secret file.")
+                time.sleep(1)
             return TOKEN
-        
-print("Starting up. 🚀 ")
+    else:
+        logging.warning("🔐 Secret file not found. Prompting for token.")
+        TOKEN = input("Please paste your AQI API token: ").strip()
+        with open(token_secret, "w") as f:
+            f.write(TOKEN)
+        logging.info("✅ Token saved to secret file.")
+        return TOKEN
+
+
+logging.info("Starting up. \U0001F680")
 TOKEN = load_token(token_secret)
 
 # Load cached AQI data if exists
@@ -36,7 +56,7 @@ if os.path.exists(cache_file):
     with open(cache_file, "r") as f:
         aqi_cache = json.load(f)
 else:
-    print("  ⚠️ aqi_cache doesn't exist. Creating new one")
+    logging.warning("⚠️ aqi_cache doesn't exist. Creating new one")
     aqi_cache = {}
 
 # Load feature code data if exists
@@ -45,26 +65,26 @@ if os.path.exists(feature_codes_file):
     with open(feature_codes_file, "r", encoding="utf-8") as g:
         reader = csv.DictReader(g, delimiter="\t")
         for row in reader:
-            code = row["Code"]         # e.g., "P.PPL"
+            code = row["Code"]
             description = row["Description"]
             feature_codes[code] = description
 else:
-    print("  ⚠️ featureCodes_en.csv couldn't be loaded!")
+    logging.warning("⚠️ featureCodes_en.csv couldn't be loaded!")
 
 
 def save_cache():
     with open(cache_file, "w") as f:
         json.dump(aqi_cache, f)
-    print("✅ AQI cache saved.")
-    
-def generate_map():
+    logging.info("✅ AQI cache saved.")
 
+
+def generate_map():
     # Add heatmap
     if heat_data:
-        print(f"Adding heatmap with {len(heat_data)} points…")
-        HeatMap(heat_data, radius=25, blur=15, min_opacity=0.25,name="AQI Heatmap").add_to(m)
+        logging.info(f"Adding heatmap with {len(heat_data)} points…")
+        HeatMap(heat_data, radius=25, blur=15, min_opacity=0.25, name="AQI Heatmap").add_to(m)
     else:
-        print("  ⚠️ No heat data available.")
+        logging.warning("⚠️ No heat data available.")
 
     # Add WAQI tile layer
     folium.raster_layers.TileLayer(
@@ -86,8 +106,9 @@ def generate_map():
         force_separate_button=True,
     ))
     # Save final map
-    m.save(f"output\{output_file_name}")
-    print(f"Map saved to output folder. Filename:{output_file_name}")
+    m.save(f"output\\{output_file_name}")
+    logging.info(f"Map saved to output folder. Filename: {output_file_name}")
+
 
 def get_aqi_color(aqi):
     if aqi <= 50:
@@ -103,6 +124,7 @@ def get_aqi_color(aqi):
     else:
         return "purple"
 
+
 def get_aqi_category(aqi):
     if aqi <= 50:
         return "Good"
@@ -116,6 +138,7 @@ def get_aqi_category(aqi):
         return "Very Unhealthy"
     else:
         return "Hazardous"
+
 
 def get_aqi_emoji(aqi):
     if aqi <= 50:
@@ -131,10 +154,10 @@ def get_aqi_emoji(aqi):
     else:
         return "🟣"
 
+
 def get_feature_code_desc(feature_class, feature_code):
-    """Returns the description for a feature code given class and code."""
     fcode = f"{feature_class}.{feature_code}"
-    return feature_codes.get(fcode, "  ⚠️ Unknown feature code")
+    return feature_codes.get(fcode, "⚠️ Unknown feature code")
 
 columns = [
     "geonameid", "name", "asciiname", "alternatenames", "latitude", "longitude",
@@ -144,53 +167,47 @@ columns = [
 ]
 
 try:
-
     df = pd.read_csv("sk.txt", sep='\t', header=None, names=columns)
-
-    # Filter cities in Slovakia with population above threshold
     threshold = 0
     locations = [
-    [row["name"], row["latitude"], row["longitude"],row["feature_class"],row["feature_code"]]
-    for _, row in df.iterrows()
-    if row["population"] > threshold and row["feature_class"] != "" 
+        [row["name"], row["latitude"], row["longitude"], row["feature_class"], row["feature_code"]]
+        for _, row in df.iterrows()
+        if row["population"] > threshold and row["feature_class"] != ""
     ]
 
-    # Setup map
     m = folium.Map(location=[48.7, 19.5], zoom_start=8, tiles="OpenStreetMap")
-    marker_cluster = MarkerCluster(name="City Marker Clusters",).add_to(m)
+    marker_cluster = MarkerCluster(name="City Marker Clusters").add_to(m)
     heat_data = []
 
-    # Loop over list
-    for idx, (city, lat, lon,fclass, fcode) in enumerate(locations, start=1):
+    for idx, (city, lat, lon, fclass, fcode) in enumerate(locations, start=1):
         key = f"{lat},{lon}"
         percent = (idx / len(locations)) * 100
+        logging.info(f"[{idx}/{len(locations)}] [{percent:.1f}%] Processing city: {city}")
 
-        print(f"[{idx}/{len(locations)}] [{percent:.1f}%] Processing city:{city}")
-        
         if key in aqi_cache:
             data = aqi_cache[key]
-            print(f"  ✅ Using cached data for {city}")
+            logging.info(f"  ✅ Using cached data for {city}")
         else:
             try:
-                print(f"  ⬇️ Fetching data from API for {city}...")
+                logging.info(f"  ⬇️ Fetching data from API for {city}...")
                 url = f"https://api.waqi.info/feed/geo:{lat};{lon}/?token={TOKEN}"
                 resp = requests.get(url, timeout=10).json()
                 if resp.get("status") == "ok":
                     data = resp["data"]
                     aqi_cache[key] = data
-                    time.sleep(1)  # be nice to the API
+                    time.sleep(1)
                 else:
-                    print(f"  ⚠️ No data for {city}: {resp.get('data')}")
+                    logging.warning(f"  ⚠️ No data for {city}: {resp.get('data')}")
                     continue
             except Exception as e:
-                print(f"  ❌ Error fetching {city}: {e}")
+                logging.error(f"  ❌ Error fetching {city}: {e}")
                 continue
 
         aqi = data.get("aqi", 0)
         dom = data.get("dominentpol", "N/A")
         iaqi = data.get("iaqi", {})
 
-        print(f"  {get_aqi_emoji(aqi)} {city} AQI = {aqi} (dominant: {dom}) Status: {get_aqi_category(aqi)} feature class: {get_feature_code_desc(fclass,fcode)}")
+        logging.info(f"  {get_aqi_emoji(aqi)} {city} AQI = {aqi} (dominant: {dom}) Status: {get_aqi_category(aqi)} feature class: {get_feature_code_desc(fclass, fcode)}")
         heat_data.append([lat, lon, aqi])
 
         popup = f"<b>{city}</b><br>Status: <b>{get_aqi_category(aqi)}</b><br>AQI: <b>{aqi}</b><br>Dominant: <b>{dom.upper()}</b><br>"
@@ -206,9 +223,8 @@ try:
     generate_map()
 
 except KeyboardInterrupt:
-    print("\n⏹️ Interrupted by user.")
+    logging.info("⏹️ Interrupted by user.")
 
 finally:
-
     save_cache()
     generate_map()
