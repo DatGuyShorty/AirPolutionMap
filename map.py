@@ -77,7 +77,7 @@ def load_token(token_path: str) -> str:
     with open(token_path, "w", encoding="utf-8") as f:
         f.write(token)
     logging.info("✅ API token saved to %s.", token_path)
-    time.sleep(1)
+    time.sleep(3)
     return token
 
 
@@ -232,7 +232,7 @@ def get_feature_code_desc(feature_class: str, feature_code: str, feature_codes: 
     return feature_codes.get(fkey, "⚠️ Unknown feature code")
 
 
-def fetch_aqi_for_location(lat: float, lon: float, token: str, cache: dict, delay: float = 1.0) -> dict:
+def fetch_aqi_for_location(lat: float, lon: float, token: str, cache: dict, delay: float = 0.25) -> dict:
     """
     Fetch AQI data for a given latitude/longitude from the WAQI API, using and updating the cache.
     - If a new-format cache entry exists and is younger than CACHE_TTL_SECONDS, return it.
@@ -486,8 +486,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--population-threshold",
         type=int,
-        default=0,
-        help="Minimum population of locations to include (default: 0)."
+        default=1000,
+        help="Minimum population of locations to include (default: 1000)."
     )
     return parser.parse_args()
 
@@ -530,7 +530,6 @@ def main():
         # Save cache on exit (even if interrupted)
         save_cache(aqi_cache, args.cache_file)
         logging.info("ℹ️ AQI map generation terminated; cache saved.")
-
-
+    
 if __name__ == "__main__":
     main()
